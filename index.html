@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#436d60">
+<title>Habit Tracker</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+:root{color-scheme:light dark;--bg:#f7f7f5;--panel:#fff;--text:#202124;--muted:#6b7280;--border:#ddd;--accent:#436d60;--soft:#e8f0ed;--done:#dfece7}
+@media(prefers-color-scheme:dark){:root{--bg:#151716;--panel:#1f2220;--text:#f4f4f3;--muted:#a6aaa7;--border:#3a3e3b;--accent:#8db9aa;--soft:#283a34;--done:#263b34}}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+button,input{font:inherit}.app{max-width:760px;margin:auto;padding:16px 14px 80px}header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+h1{margin:0;font-size:1.5rem}.muted{color:var(--muted);font-size:.9rem}.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 16px}
+button,.btn{border:1px solid var(--border);border-radius:12px;background:var(--panel);color:var(--text);padding:10px 12px;min-height:44px}
+.tabs .active{background:var(--soft);border-color:var(--accent);font-weight:650}.card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px}
+.summary{display:flex;justify-content:space-between;align-items:end;gap:10px}.score{font-size:2rem;font-weight:750}.progress{height:9px;background:var(--border);border-radius:99px;overflow:hidden;margin-top:10px}.progress div{height:100%;background:var(--accent)}
+.habit-list{display:grid;gap:9px}.habit{display:flex;gap:12px;align-items:center;padding:12px;border:1px solid var(--border);border-radius:14px;background:var(--panel);min-height:54px}.habit.done{background:var(--done)}.habit input{width:24px;height:24px;accent-color:var(--accent)}.habit .txt{flex:1;line-height:1.25}.habit small{display:block;color:var(--muted);margin-top:3px}
+.hidden{display:none!important}.calendar-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}.calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.dow{text-align:center;color:var(--muted);font-size:.75rem}.day{aspect-ratio:1;border:1px solid var(--border);border-radius:10px;background:var(--panel);color:var(--text);display:flex;flex-direction:column;align-items:center;justify-content:center}.day.today{outline:2px solid var(--accent)}.day .s{font-size:.7rem;color:var(--muted)}
+.stats{display:grid;gap:8px}.stat{display:grid;grid-template-columns:minmax(0,1fr) 50px;gap:8px;align-items:center}.bar{height:8px;border-radius:99px;background:var(--border);overflow:hidden;margin-top:4px}.bar div{height:100%;background:var(--accent)}.pct{text-align:right;color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1 1 140px}.edit{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:10px;border:1px solid var(--border);border-radius:12px;margin-top:8px}.edit input[type=text]{width:100%;min-height:44px;padding:9px;border:1px solid var(--border);border-radius:10px;background:var(--panel);color:var(--text);font-size:16px}.note{font-size:.86rem;color:var(--muted);line-height:1.4}label.btn{display:flex;align-items:center;justify-content:center;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="app">
+<header><div><h1>Habit Tracker</h1><div id="dateLabel" class="muted"></div></div><button id="installBtn" hidden>Install</button></header>
+<div class="tabs"><button data-tab="today" class="active">Today</button><button data-tab="month">Month</button><button data-tab="settings">Settings</button></div>
+
+<section id="today">
+<div class="card"><div class="summary"><div><div class="muted">Today's scored habits</div><div class="score"><span id="done">0</span>/<span id="total">0</span></div></div><div id="percent" class="muted">0%</div></div><div class="progress"><div id="progress"></div></div></div>
+<div id="habitList" class="habit-list"></div>
+</section>
+
+<section id="month" class="hidden">
+<div class="card"><div class="calendar-head"><button id="prev">‹</button><strong id="monthTitle"></strong><button id="next">›</button></div><div id="calendar" class="calendar"></div><p class="note">Tap a day to edit it. The small number is completed scored habits.</p></div>
+<div class="card"><strong>Monthly completion</strong><div id="stats" class="stats" style="margin-top:10px"></div></div>
+</section>
+
+<section id="settings" class="hidden">
+<div class="card"><strong>Habits</strong><p class="note">Daily use stays simple. Change habits here only when you want to.</p><div id="editor"></div><button id="addHabit" style="margin-top:10px">+ Add habit</button></div>
+<div class="card"><strong>Backup</strong><p class="note">Data is stored only in this browser. Export a backup periodically.</p><div class="row"><button id="exportJson">Export backup</button><button id="exportCsv">Export CSV</button><label class="btn">Import backup<input id="importJson" type="file" accept="application/json" hidden></label></div></div>
+<div class="card"><strong>Privacy</strong><p class="note">This version has no account, analytics, or remote database. Your entries stay on this device unless you export them.</p></div>
+<div class="card"><strong>Install on phone</strong><p class="note">After this folder is hosted on an HTTPS site: iPhone Safari → Share → Add to Home Screen. Android Chrome → menu → Install app/Add to Home screen.</p></div>
+</section>
+</div>
+<script>
+(()=>{
+const KEY='habit-tracker-v1';
+const defaults=[
+['brush','Brush teeth and/or floss',1],['admin','Complete one or more chore/errand/admin task',1],['hazel','Walk Hazel',1],['read','Read at least 20 minutes',1],['nyx','Walk Nyx',1],['weight','Weight down from previous day',1],['smoke','Smoke no more than three bowls (and no edibles)',1],['tidy','Tidy bedroom at least 5 minutes',1],['journal','Journal',1],['alanon','Al-Anon: meeting, reading, Step work, etc.',1],['tv','Limit TV to no more than two hours',1],['grading','Grading, any kind, at least 20 minutes',1],['impulse','No same-day impulse purchases',1],['planning','Lesson planning at least 20 minutes',1],['shower','Shower',1]
+].map(x=>({id:x[0],name:x[1],scored:!!x[2],active:true}));
+let state=load(), selected=todayISO(), cursor=new Date(Date.UTC(new Date().getFullYear(),new Date().getMonth(),1)), deferred=null;
+function load(){try{let x=JSON.parse(localStorage.getItem(KEY));return x&&Array.isArray(x.habits)&&x.entries?x:{habits:defaults,entries:{}}}catch(e){return{habits:defaults,entries:{}}}}
+function save(){localStorage.setItem(KEY,JSON.stringify(state))}
+function todayISO(){let d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function dfrom(s){let [y,m,d]=s.split('-').map(Number);return new Date(Date.UTC(y,m-1,d))}
+function fmt(s){return new Intl.DateTimeFormat(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric',timeZone:'UTC'}).format(dfrom(s))}
+function habits(){return state.habits.filter(h=>h.active!==false)}
+function ent(s){return state.entries[s]||(state.entries[s]={})}
+function score(s){let e=state.entries[s]||{}, hs=habits().filter(h=>h.scored), done=hs.filter(h=>e[h.id]).length;return{done,total:hs.length}}
+function tab(id){document.querySelectorAll('section').forEach(x=>x.classList.toggle('hidden',x.id!==id));document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));if(id==='month')renderMonth();if(id==='settings')renderSettings()}
+document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
+function renderToday(){
+document.getElementById('dateLabel').textContent=fmt(selected);let e=ent(selected), list=document.getElementById('habitList');list.innerHTML='';
+habits().forEach(h=>{let lab=document.createElement('label');lab.className='habit'+(e[h.id]?' done':'');let cb=document.createElement('input');cb.type='checkbox';cb.checked=!!e[h.id];cb.addEventListener('change',()=>{e[h.id]=cb.checked;save();renderToday()});let txt=document.createElement('div');txt.className='txt';txt.textContent=h.name;if(!h.scored){let sm=document.createElement('small');sm.textContent='Not included in score';txt.appendChild(sm)}lab.append(cb,txt);list.appendChild(lab)});
+let s=score(selected),p=s.total?Math.round(s.done/s.total*100):0;done.textContent=s.done;total.textContent=s.total;percent.textContent=p+'%';progress.style.width=p+'%';
+}
+function renderMonth(){
+let y=cursor.getUTCFullYear(),m=cursor.getUTCMonth(),cal=document.getElementById('calendar');monthTitle.textContent=new Intl.DateTimeFormat(undefined,{month:'long',year:'numeric',timeZone:'UTC'}).format(cursor);cal.innerHTML='';['S','M','T','W','T','F','S'].forEach(x=>{let d=document.createElement('div');d.className='dow';d.textContent=x;cal.appendChild(d)});
+let first=new Date(Date.UTC(y,m,1)).getUTCDay(),days=new Date(Date.UTC(y,m+1,0)).getUTCDate();for(let i=0;i<first;i++){cal.appendChild(document.createElement('div'))}
+for(let d=1;d<=days;d++){let iso=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'),s=score(iso),b=document.createElement('button');b.className='day'+(iso===todayISO()?' today':'');b.innerHTML='<span>'+d+'</span><span class="s">'+s.done+'/'+s.total+'</span>';b.addEventListener('click',()=>{selected=iso;renderToday();tab('today')});cal.appendChild(b)}
+let box=document.getElementById('stats');box.innerHTML='';habits().forEach(h=>{let eligible=0,ok=0;for(let d=1;d<=days;d++){let iso=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');if(iso>todayISO())continue;eligible++;if(state.entries[iso]&&state.entries[iso][h.id])ok++}let p=eligible?Math.round(ok/eligible*100):0,r=document.createElement('div');r.className='stat';r.innerHTML='<div><div>'+escapeHTML(h.name)+'</div><div class="bar"><div style="width:'+p+'%"></div></div></div><div class="pct">'+p+'%</div>';box.appendChild(r)});
+}
+prev.addEventListener('click',()=>{cursor=new Date(Date.UTC(cursor.getUTCFullYear(),cursor.getUTCMonth()-1,1));renderMonth()});next.addEventListener('click',()=>{cursor=new Date(Date.UTC(cursor.getUTCFullYear(),cursor.getUTCMonth()+1,1));renderMonth()});
+function renderSettings(){let box=document.getElementById('editor');box.innerHTML='';habits().forEach(h=>{let r=document.createElement('div');r.className='edit';let left=document.createElement('div'),inp=document.createElement('input');inp.type='text';inp.value=h.name;inp.addEventListener('change',()=>{h.name=inp.value.trim()||h.name;save();renderToday()});let lab=document.createElement('label');lab.className='note';lab.style='display:flex;gap:6px;align-items:center;margin-top:5px';let cb=document.createElement('input');cb.type='checkbox';cb.checked=h.scored;cb.addEventListener('change',()=>{h.scored=cb.checked;save();renderToday()});lab.append(cb,document.createTextNode(' Counts toward daily score'));left.append(inp,lab);let del=document.createElement('button');del.textContent='×';del.setAttribute('aria-label','Remove habit');del.addEventListener('click',()=>{if(confirm('Remove from future daily lists? Past data will stay saved.')){h.active=false;save();renderSettings();renderToday()}});r.append(left,del);box.appendChild(r)})}
+addHabit.addEventListener('click',()=>{let name=prompt('Habit name');if(name&&name.trim()){state.habits.push({id:'h'+Date.now(),name:name.trim(),scored:true,active:true});save();renderSettings();renderToday()}});
+function download(name,text,type){let blob=new Blob([text],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500)}
+exportJson.addEventListener('click',()=>download('habit-backup-'+todayISO()+'.json',JSON.stringify(state,null,2),'application/json'));
+exportCsv.addEventListener('click',()=>{let hs=state.habits,dates=Object.keys(state.entries).sort(),q=s=>'"'+String(s).replaceAll('"','""')+'"',rows=[['Date',...hs.map(h=>h.name),'Scored total'].map(q).join(',')];dates.forEach(date=>{let e=state.entries[date]||{},s=score(date);rows.push([date,...hs.map(h=>e[h.id]?'1':'0'),s.done+'/'+s.total].map(q).join(','))});download('habit-data-'+todayISO()+'.csv',rows.join('\n'),'text/csv')});
+importJson.addEventListener('change',async ev=>{let f=ev.target.files&&ev.target.files[0];if(!f)return;try{let x=JSON.parse(await f.text());if(!x||!Array.isArray(x.habits)||typeof x.entries!=='object')throw 0;if(confirm('Replace data on this device with this backup?')){state=x;save();renderToday();renderSettings();alert('Backup imported.')}}catch(e){alert('Invalid backup file.')}ev.target.value=''});
+function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;installBtn.hidden=false});installBtn.addEventListener('click',async()=>{if(!deferred)return;deferred.prompt();await deferred.userChoice;deferred=null;installBtn.hidden=true});
+if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+renderToday();
+})();
+</script>
+</body></html>
